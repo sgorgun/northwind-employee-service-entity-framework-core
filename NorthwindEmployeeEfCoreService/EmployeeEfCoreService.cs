@@ -7,6 +7,8 @@ namespace NorthwindEmployeeEfCoreService;
 /// </summary>
 public sealed class EmployeeEfCoreService
 {
+    private readonly IDbContextFactory<EmployeeContext> dbContextFactory;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="EmployeeEfCoreService"/> class.
     /// </summary>
@@ -14,7 +16,7 @@ public sealed class EmployeeEfCoreService
     /// <exception cref="ArgumentNullException">Thrown when either <paramref name="dbContextFactory"/> is null.</exception>
     public EmployeeEfCoreService(IDbContextFactory<EmployeeContext> dbContextFactory)
     {
-        throw new NotImplementedException();
+        this.dbContextFactory = dbContextFactory ?? throw new ArgumentNullException(nameof(dbContextFactory));
     }
 
     /// <summary>
@@ -23,7 +25,8 @@ public sealed class EmployeeEfCoreService
     /// <returns>A list of Employee objects representing the retrieved employees.</returns>
     public IList<Employee> GetEmployees()
     {
-        throw new NotImplementedException();
+        using var dbContext = dbContextFactory.CreateDbContext();
+        return dbContext.Employees.ToList();
     }
 
     /// <summary>
@@ -34,7 +37,9 @@ public sealed class EmployeeEfCoreService
     /// <exception cref="EmployeeServiceException">Thrown when the employee is not found.</exception>
     public Employee GetEmployee(long id)
     {
-        throw new NotImplementedException();
+        using var dbContext = dbContextFactory.CreateDbContext();
+        return dbContext.Employees.FirstOrDefault(e => e.Id == id)
+            ?? throw new EmployeeServiceException($"Employee with ID {id} not found.");
     }
 
     /// <summary>
@@ -45,7 +50,15 @@ public sealed class EmployeeEfCoreService
     /// <exception cref="EmployeeServiceException">Thrown when an error occurs while adding the employee.</exception>
     public long AddEmployee(Employee employee)
     {
-        throw new NotImplementedException();
+        if (employee == null)
+        {
+            throw new ArgumentNullException(nameof(employee));
+        }
+
+        using var dbContext = dbContextFactory.CreateDbContext();
+        dbContext.Employees.Add(employee);
+        dbContext.SaveChanges();
+        return employee.Id != 0 ? employee.Id : throw new EmployeeServiceException("Employee ID wasn't set after insertion.");
     }
 
     /// <summary>
@@ -55,7 +68,16 @@ public sealed class EmployeeEfCoreService
     /// <exception cref="EmployeeServiceException"> Thrown when an error occurs while attempting to remove the employee.</exception>
     public void RemoveEmployee(long id)
     {
-        throw new NotImplementedException();
+        using var dbContext = dbContextFactory.CreateDbContext();
+        var employee = dbContext.Employees.FirstOrDefault(e => e.Id == id)
+            ?? throw new EmployeeServiceException($"Employee with ID {id} not found.");
+        dbContext.Employees.Remove(employee);
+        dbContext.SaveChanges();
+
+        if (dbContext.Employees.Any(e => e.Id == id))
+        {
+            throw new EmployeeServiceException($"Employee with ID {id} wasn't removed.");
+        }
     }
 
     /// <summary>
@@ -65,6 +87,20 @@ public sealed class EmployeeEfCoreService
     /// <exception cref="EmployeeServiceException">Thrown when there is an issue updating the employee record.</exception>
     public void UpdateEmployee(Employee employee)
     {
-        throw new NotImplementedException();
+        if (employee == null)
+        {
+            throw new ArgumentNullException(nameof(employee));
+        }
+
+        using var dbContext = dbContextFactory.CreateDbContext();
+        dbContext.Employees.Update(employee);
+        try
+        {
+            dbContext.SaveChanges();
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new EmployeeServiceException($"Employee with ID {employee.Id} not found after update.");
+        }
     }
 }
